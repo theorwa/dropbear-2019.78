@@ -125,10 +125,18 @@ typedef struct svr_runopts {
 
 	char * forced_command;
 
+	bool is_udp; // Orwa Watad
+
+#if DROPBEAR_PLUGIN 
+        char *pubkey_plugin;
+        char *pubkey_plugin_options;
+#endif
+
 } svr_runopts;
 
 extern svr_runopts svr_opts;
 
+void addnewport(const char* spec); // Orwa watad
 void svr_getopts(int argc, char ** argv);
 void loadhostkeys(void);
 

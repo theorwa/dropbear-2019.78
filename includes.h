@@ -39,6 +39,8 @@
 #include <sys/wait.h>
 #include <sys/resource.h>
 
+#include <stdbool.h>
+
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>

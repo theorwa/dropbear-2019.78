@@ -46,16 +46,16 @@ static void printhelp(const char * progname) {
 					"-b bannerfile	Display the contents of bannerfile"
 					" before user login\n"
 					"		(default: none)\n"
-					"-r keyfile      Specify hostkeys (repeatable)\n"
+					"-r keyfile  Specify hostkeys (repeatable)\n"
 					"		defaults: \n"
 #if DROPBEAR_DSS
-					"		- dss %s\n"
+					"		dss %s\n"
 #endif
 #if DROPBEAR_RSA
-					"		- rsa %s\n"
+					"		rsa %s\n"
 #endif
 #if DROPBEAR_ECDSA
-					"		- ecdsa %s\n"
+					"		ecdsa %s\n"
 #endif
 #if DROPBEAR_DELAY_HOSTKEY
 					"-R		Create hostkeys as required\n" 
@@ -87,7 +87,6 @@ static void printhelp(const char * progname) {
 					"-a		Allow connections to forwarded ports from any host\n"
 					"-c command	Force executed command\n"
 #endif
-					"-U //Orwa	Listen for UDP packet on port 53" // Orwa Watad
 					"-p [address:]port\n"
 					"		Listen on specified tcp port (and optionally address),\n"
 					"		up to %d can be specified\n"
@@ -100,10 +99,6 @@ static void printhelp(const char * progname) {
 					"-W <receive_window_buffer> (default %d, larger may be faster, max 1MB)\n"
 					"-K <keepalive>  (0 is never, default %d, in seconds)\n"
 					"-I <idle_timeout>  (0 is never, default %d, in seconds)\n"
-#if DROPBEAR_PLUGIN
-                                        "-A <authplugin>[,<options>]\n"
-                                        "               Enable external public key auth through <authplugin>\n"
-#endif
 					"-V    Version\n"
 #if DEBUG_TRACE
 					"-v		verbose (compiled with DEBUG_TRACE)\n"
@@ -134,9 +129,6 @@ void svr_getopts(int argc, char ** argv) {
 	char* maxauthtries_arg = NULL;
 	char* keyfile = NULL;
 	char c;
-#if DROPBEAR_PLUGIN
-        char* pubkey_plugin = NULL;
-#endif
 
 
 	/* see printhelp() for options */
@@ -158,17 +150,11 @@ void svr_getopts(int argc, char ** argv) {
 	svr_opts.hostkey = NULL;
 	svr_opts.delay_hostkey = 0;
 	svr_opts.pidfile = DROPBEAR_PIDFILE;
-	svr_opts.is_udp = false; // Orwa Watad
-	
 #if DROPBEAR_SVR_LOCALTCPFWD
 	svr_opts.nolocaltcp = 0;
 #endif
 #if DROPBEAR_SVR_REMOTETCPFWD
 	svr_opts.noremotetcp = 0;
-#endif
-#if DROPBEAR_PLUGIN
-        svr_opts.pubkey_plugin = NULL;
-        svr_opts.pubkey_plugin_options = NULL;
 #endif
 
 #ifndef DISABLE_ZLIB
@@ -238,10 +224,6 @@ void svr_getopts(int argc, char ** argv) {
 					svr_opts.inetdmode = 1;
 					break;
 #endif
-				// Orwa Watad
-				case 'U':
-					svr_opts.is_udp = true;
-					break;
 				case 'p':
 				  nextisport = 1;
 				  break;
@@ -292,11 +274,6 @@ void svr_getopts(int argc, char ** argv) {
 				case 'u':
 					/* backwards compatibility with old urandom option */
 					break;
-#if DROPBEAR_PLUGIN
-                                case 'A':
-                                        next = &pubkey_plugin;
-                                        break;
-#endif
 #if DEBUG_TRACE
 				case 'v':
 					debug_trace = 1;
@@ -342,17 +319,12 @@ void svr_getopts(int argc, char ** argv) {
 		}
 	}
 
-	// Orwa Watad
 	/* Set up listening ports */
 	if (svr_opts.portcount == 0) {
-		if (svr_opts.is_udp)
-			svr_opts.ports[0] = m_strdup(DROPBEAR_DEFPORT_UDP);
-		else
-			svr_opts.ports[0] = m_strdup(DROPBEAR_DEFPORT);
+		svr_opts.ports[0] = m_strdup(DROPBEAR_DEFPORT);
 		svr_opts.addresses[0] = m_strdup(DROPBEAR_DEFADDRESS);
 		svr_opts.portcount = 1;
 	}
-	// Orwa Watad
 
 	if (svr_opts.bannerfile) {
 		struct stat buf;
@@ -422,24 +394,7 @@ void svr_getopts(int argc, char ** argv) {
 	if (svr_opts.forced_command) {
 		dropbear_log(LOG_INFO, "Forced command set to '%s'", svr_opts.forced_command);
 	}
-#if DROPBEAR_PLUGIN
-        if (pubkey_plugin) {
-            char *args = strchr(pubkey_plugin, ',');
-            if (args) {
-                *args='\0';
-                ++args;
-            }
-            svr_opts.pubkey_plugin = pubkey_plugin;
-            svr_opts.pubkey_plugin_options = args;
-        }
-#endif
 }
-
-void addnewport(const char* spec) {
-	addportandaddress(spec);
-}
-
-
 
 static void addportandaddress(const char* spec) {
 	char *spec_copy = NULL, *myspec = NULL, *port = NULL, *address = NULL;

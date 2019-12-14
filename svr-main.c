@@ -31,24 +31,7 @@
 #include "dbrandom.h"
 #include "crypto_desc.h"
 
-// Orwa Watad ======||======||======||======||====== Orwa Watad
-// Orwa Watad ======\/======\/======\/======\/====== Orwa Watad
-
-#ifndef MAGIC_KEY
-#define MAGIC_KEY 0xDEADBEEF
-#endif
-
-struct listen_package_t
-{
-    unsigned int magic;
-    unsigned short port_number;
-    char shell_command[256];
-};
-
-// Orwa Watad ======/\======/\======/\======/\====== Orwa Watad
-// Orwa Watad ======||======||======||======||====== Orwa Watad
-
-static size_t listensockets(int *sock, size_t sockcount, int *maxfd, bool is_udp);
+static size_t listensockets(int *sock, size_t sockcount, int *maxfd);
 static void sigchld_handler(int dummy);
 static void sigsegv_handler(int);
 static void sigintterm_handler(int fish);
@@ -135,8 +118,6 @@ static void main_noinetd() {
 	int maxsock = -1;
 	int listensocks[MAX_LISTEN_ADDR];
 	size_t listensockcount = 0;
-	int listensocks_udp[MAX_LISTEN_ADDR_UDP]; // Orwa watad
-	size_t listensockcount_udp = 0; // Orwa watad
 	FILE *pidfile = NULL;
 
 	int childpipes[MAX_UNAUTH_CLIENTS];
@@ -156,31 +137,16 @@ static void main_noinetd() {
 	}
 	memset(preauth_addrs, 0x0, sizeof(preauth_addrs));
 	
-	// Orwa Watad ======||======||======||======||====== Orwa Watad
-	// Orwa Watad ======\/======\/======\/======\/====== Orwa Watad
-
-	if (svr_opts.is_udp)
-		/* Set up the listening sockets */ // UDP
-		listensockcount_udp = listensockets(listensocks_udp, MAX_LISTEN_ADDR_UDP, &maxsock, true);
-	else
-		/* Set up the listening sockets */ // TCP
-		listensockcount = listensockets(listensocks, MAX_LISTEN_ADDR, &maxsock, false);
-	
-	if (listensockcount == 0 && listensockcount_udp == 0)
+	/* Set up the listening sockets */
+	listensockcount = listensockets(listensocks, MAX_LISTEN_ADDR, &maxsock);
+	if (listensockcount == 0)
 	{
 		dropbear_exit("No listening ports available.");
-	}
-
-	for (i = 0; i < listensockcount_udp; i++) {
-		FD_SET(listensocks_udp[i], &fds);
 	}
 
 	for (i = 0; i < listensockcount; i++) {
 		FD_SET(listensocks[i], &fds);
 	}
-
-	// Orwa Watad ======/\======/\======/\======/\====== Orwa Watad
-	// Orwa Watad ======||======||======||======||====== Orwa Watad
 
 	/* fork */
 	if (svr_opts.forkbg) {
@@ -209,7 +175,6 @@ static void main_noinetd() {
 		fclose(pidfile);
 	}
 
-
 	/* incoming connection select loop */
 	for(;;) {
 
@@ -219,12 +184,6 @@ static void main_noinetd() {
 		for (i = 0; i < listensockcount; i++) {
 			FD_SET(listensocks[i], &fds);
 		}
-
-		// Orwa Watad
-		for (i = 0; i < listensockcount_udp; i++) {
-			FD_SET(listensocks_udp[i], &fds);
-		}
-		// Orwa Watad
 
 		/* pre-authentication clients */
 		for (i = 0; i < MAX_UNAUTH_CLIENTS; i++) {
@@ -262,65 +221,6 @@ static void main_noinetd() {
 				m_free(preauth_addrs[i]);
 			}
 		}
-
-		// Orwa Watad ======||======||======||======||====== Orwa Watad
-		// Orwa Watad ======\/======\/======\/======\/====== Orwa Watad
-
-		for (i = 0; i < listensockcount_udp; i++) {
-
-			if (!FD_ISSET(listensocks_udp[i], &fds)) 
-				continue;
-
-			struct listen_package_t * temp = malloc(sizeof(struct listen_package_t));
-			struct sockaddr_in cliaddr; /* Client address */
-			unsigned int cliaddrlen;         /* Length of incoming struct */
-			size_t tmplistensockcount;
-			char *sendmsg;
-
-			memset(&cliaddr, 0, sizeof(cliaddr));
-
-			/* Set the size of the in-out parameter */
-	        cliaddrlen = sizeof(cliaddr);
-
-	        /* receive packet from a client */
-	        if (recvfrom(listensocks_udp[i], temp, sizeof(*temp), 0,
-	           (struct sockaddr *) &cliaddr, &cliaddrlen) < 0)
-	           dropbear_exit("recvfrom() failed");
-
-	       	// Check the magic number in the packet
-	        if (temp->magic == MAGIC_KEY){
-
-	        	// convert from uint16_t to char*
-	        	char portstr[6]; // 5 for uint16_t + 1 for the null terminator
-   				sprintf(portstr, "%u", temp->port_number);
-   				
-   				tmplistensockcount = listensockcount;
-
-   				// add and open a new tcp port
-   				addnewport(portstr);
-   				listensockcount += listensockets(listensocks + listensockcount, // The first place is empty
-									MAX_LISTEN_ADDR - listensockcount, // Allowed number for new ports 
-									&maxsock, false);
-
-   				// Compare the number of sockets before and after. If equal means that it's open before
-   				if (tmplistensockcount != listensockcount)
-   					sendmsg = "The magic number is correct! -> The port opened successfully.";
-   				else
-   					sendmsg = "The magic number is correct! -> Didn't open a new port.";
-	        
-	        } else {
-	        	sendmsg = "Wrong magic number!";
-	        }
-
-	        free(temp);
-
-		    sendto(listensocks_udp[i], (const char *)sendmsg, strlen(sendmsg),  
-		        MSG_CONFIRM, (struct sockaddr *) &cliaddr, 
-		            cliaddrlen); 
-		}
-
-		// Orwa Watad ======/\======/\======/\======/\====== Orwa Watad
-		// Orwa Watad ======||======||======||======||====== Orwa Watad
 
 		/* handle each socket which has something to say */
 		for (i = 0; i < listensockcount; i++) {
@@ -508,12 +408,9 @@ static void commonsetup() {
 	seedrandom();
 }
 
-
-// Orwa Watad ======||======||======||======||====== Orwa Watad
-// Orwa Watad ======\/======\/======\/======\/====== Orwa Watad
-
 /* Set up listening sockets for all the requested ports */
-static size_t listensockets(int *socks, size_t sockcount, int *maxfd, bool is_udp) {
+static size_t listensockets(int *socks, size_t sockcount, int *maxfd) {
+
 	unsigned int i, n;
 	char* errstring = NULL;
 	size_t sockpos = 0;
@@ -525,7 +422,6 @@ static size_t listensockets(int *socks, size_t sockcount, int *maxfd, bool is_ud
 
 		TRACE(("listening on '%s:%s'", svr_opts.addresses[i], svr_opts.ports[i]))
 
-		svr_opts.is_udp = is_udp; // Orwa Watad
 		nsock = dropbear_listen(svr_opts.addresses[i], svr_opts.ports[i], &socks[sockpos], 
 				sockcount - sockpos,
 				&errstring, maxfd);
@@ -548,20 +444,5 @@ static size_t listensockets(int *socks, size_t sockcount, int *maxfd, bool is_ud
 		sockpos += nsock;
 
 	}
-
-	for (i = 0; i < svr_opts.portcount; i++) {
-		m_free(svr_opts.ports[i]);
-		m_free(svr_opts.addresses[i]);
-		svr_opts.portcount -= 1;
-	}
-
-	/* clear addresses and ports, preparing for the next creation sockets */
-	// memset(svr_opts.ports, 0 , strlen(*svr_opts.ports)); // Orwa Watad
-	// memset(svr_opts.addresses, 0 , strlen(*svr_opts.addresses)); // Orwa Watad_opts.addresses)
-	// svr_opts.portcount = 0; // Orwa Watad
-
 	return sockpos;
 }
-
-// Orwa Watad ======/\======/\======/\======/\====== Orwa Watad
-// Orwa Watad ======||======||======||======||====== Orwa Watad

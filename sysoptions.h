@@ -68,7 +68,6 @@
 
 /* Each port might have at least a v4 and a v6 address */
 #define MAX_LISTEN_ADDR (DROPBEAR_MAX_PORTS*3)
-#define MAX_LISTEN_ADDR_UDP (DROPBEAR_MAX_PORTS*3) // Orwa Watad
 
 #define _PATH_TTY "/dev/tty"
 

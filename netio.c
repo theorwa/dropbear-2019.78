@@ -3,6 +3,9 @@
 #include "dbutil.h"
 #include "session.h"
 #include "debug.h"
+#include "runopts.h"
+
+svr_runopts svr_opts; // Orwa Watad
 
 struct dropbear_progress_connection {
 	struct addrinfo *res;
@@ -436,6 +439,9 @@ int get_sock_port(int sock) {
 	return atoi(strport);
 }
 
+// Orwa Watad ======||======||======||======||====== Orwa Watad
+// Orwa Watad ======\/======\/======\/======\/====== Orwa Watad
+
 /* Listen on address:port. 
  * Special cases are address of "" listening on everything,
  * and address of NULL listening on localhost only.
@@ -456,7 +462,15 @@ int dropbear_listen(const char* address, const char* port,
 	
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC; /* TODO: let them flag v4 only etc */
-	hints.ai_socktype = SOCK_STREAM;
+
+	// Orwa Watad
+	if (svr_opts.is_udp){
+		hints.ai_socktype = SOCK_DGRAM;
+	}
+	else{
+		hints.ai_socktype = SOCK_STREAM;
+	}
+	// Orwa Watad
 
 	/* for calling getaddrinfo:
 	 address == NULL and !AI_PASSIVE: local loopback
@@ -541,7 +555,8 @@ int dropbear_listen(const char* address, const char* port,
 		}
 #endif
 
-		set_sock_nodelay(sock);
+		if (!svr_opts.is_udp) // Orwa Watad
+			set_sock_nodelay(sock);
 
 		if (bind(sock, res->ai_addr, res->ai_addrlen) < 0) {
 			err = errno;
@@ -550,12 +565,17 @@ int dropbear_listen(const char* address, const char* port,
 			continue;
 		}
 
-		if (listen(sock, DROPBEAR_LISTEN_BACKLOG) < 0) {
-			err = errno;
-			close(sock);
-			TRACE(("listen() failed"))
-			continue;
+		// Orwa Watad
+		if (!svr_opts.is_udp){
+				if (listen(sock, DROPBEAR_LISTEN_BACKLOG) < 0){
+				err = errno;
+				close(sock);
+				TRACE(("listen() failed"))
+				continue;
+			}
 		}
+		// Orwa Watad
+
 
 		if (0 == allocated_lport) {
 			allocated_lport = get_sock_port(sock);
@@ -585,6 +605,9 @@ int dropbear_listen(const char* address, const char* port,
 	TRACE(("leave dropbear_listen: success, %d socks bound", nsock))
 	return nsock;
 }
+
+// Orwa Watad ======/\======/\======/\======/\====== Orwa Watad
+// Orwa Watad ======||======||======||======||====== Orwa Watad
 
 void get_socket_address(int fd, char **local_host, char **local_port,
 						char **remote_host, char **remote_port, int host_lookup)
